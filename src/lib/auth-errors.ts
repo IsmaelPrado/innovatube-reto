@@ -18,9 +18,11 @@ const AUTH_ERROR_MESSAGES: Record<string, string> = {
 
 export function getAuthErrorMessage(error: unknown): string {
   if (error instanceof Error) {
+    if (/captcha|robot/i.test(error.message)) {
+      return "La verificación reCAPTCHA expiró o no fue válida. Intenta nuevamente.";
+    }
     return AUTH_ERROR_MESSAGES[error.name] ?? "No pudimos completar la operación. Intenta nuevamente.";
   }
 
   return "Ocurrió un error inesperado. Intenta nuevamente.";
 }
-

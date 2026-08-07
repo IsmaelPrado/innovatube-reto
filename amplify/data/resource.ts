@@ -71,6 +71,11 @@ export type Schema = ClientSchema<typeof schema>;
 
 export const data = defineData({
   schema,
+  logging: {
+    excludeVerboseContent: true,
+    fieldLogLevel: "error",
+    retention: "1 month",
+  },
   authorizationModes: {
     defaultAuthorizationMode: "userPool",
   },

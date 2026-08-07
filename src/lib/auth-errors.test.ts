@@ -14,5 +14,12 @@ describe("getAuthErrorMessage", () => {
       "No pudimos completar la operación. Intenta nuevamente.",
     );
   });
-});
 
+  it("translates rejected captcha validation without exposing Lambda details", () => {
+    const error = new Error("PreSignUp failed: captcha timeout-or-duplicate");
+    error.name = "UserLambdaValidationException";
+    expect(getAuthErrorMessage(error)).toBe(
+      "La verificación reCAPTCHA expiró o no fue válida. Intenta nuevamente.",
+    );
+  });
+});
