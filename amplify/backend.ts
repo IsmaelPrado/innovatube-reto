@@ -1,7 +1,8 @@
 import { defineBackend } from "@aws-amplify/backend";
 import { auth } from "./auth/resource";
+import { data, searchVideosHandler } from "./data/resource";
 
-const backend = defineBackend({ auth });
+const backend = defineBackend({ auth, data, searchVideosHandler });
 
 const { cfnUserPool } = backend.auth.resources.cfnResources;
 
@@ -10,4 +11,3 @@ cfnUserPool.usernameAttributes = [];
 cfnUserPool.aliasAttributes = ["email"];
 cfnUserPool.userPoolName = "innovatube-users";
 cfnUserPool.usernameConfiguration = { caseSensitive: false };
-
