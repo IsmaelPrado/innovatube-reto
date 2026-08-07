@@ -2,32 +2,57 @@
 
 [![CI](https://github.com/IsmaelPrado/innovatube-reto/actions/workflows/ci.yml/badge.svg)](https://github.com/IsmaelPrado/innovatube-reto/actions/workflows/ci.yml)
 
-Aplicación web fullstack para descubrir videos de YouTube y administrar una colección personal de favoritos.
+Aplicación web fullstack para descubrir videos de YouTube y administrar una colección privada de favoritos.
 
 **Aplicación desplegada:** [main.d1gqu7q6u0ec4d.amplifyapp.com](https://main.d1gqu7q6u0ec4d.amplifyapp.com/login)
 
-## Estado de la entrega
+## Cobertura del reto
+
+| Requisito | Implementación | Estado |
+| --- | --- | --- |
+| Registro público | Nombre, apellido, username, email, contraseña y confirmación | Completo |
+| reCAPTCHA | Widget v2 y validación server-side en un trigger `preSignUp` de Cognito | Completo |
+| Inicio de sesión | Username o email verificado, contraseña y logout | Completo |
+| Recuperación | Solicitud y confirmación de nueva contraseña mediante Cognito | Completo |
+| Videos | Búsqueda, orden, duración, reproducción y carga incremental | Completo |
+| Favoritos | Alta, listado con búsqueda y baja, aislados por propietario | Completo |
+| Navegación | Usuario autenticado, sidebar responsive, perfil y logout | Completo |
+| Biblioteca UI | Amplify UI para loaders y estados; Lucide para iconografía | Completo |
+| Seguridad adicional | JWT, secretos server-side, autorización owner y CAPTCHA | Completo |
+| Diseño responsivo | Desktop, tablet y navegación móvil | Completo |
+| Monitoreo y logging | Logs privados, dashboard y alarmas de CloudWatch | Completo |
+| Contenedores | No se usan: era un plus, no un requisito | No aplica |
+| Repositorio y despliegue | GitHub, CI y Amplify Hosting fullstack | Completo |
+
+Los logs operativos no se muestran en la UI porque pueden revelar detalles internos y no son útiles para un usuario final. La aplicación presenta estados seguros de carga, vacío, error y reintento; CloudWatch conserva los eventos técnicos para operación y diagnóstico.
+
+## Entrega por día
 
 ### Día 1: identidad y despliegue
 
 - Next.js 15, React 19, TypeScript y Amplify Gen 2.
-- Cognito con registro público, confirmación por email y recuperación de contraseña.
+- Cognito con registro, confirmación por email y recuperación de contraseña.
 - Login mediante username o email verificado y cierre de sesión.
-- Amplify Hosting conectado a `main` con despliegue fullstack automático.
-- CI con lint, tipos, pruebas y build de producción.
+- Amplify Hosting conectado a `main` y CI con lint, tipos, pruebas y build.
 
 ### Día 2: búsqueda y favoritos
 
 - Consulta GraphQL autenticada que invoca una función Lambda.
 - Integración server-side con YouTube Data API v3; la API key nunca llega al navegador.
-- Búsqueda con orden, duración, paginación nativa, conteo de vistas y detección de transmisiones en vivo.
-- Reproductor embebido con dominio de privacidad mejorada y enlace al video original.
-- Modelo `Favorite` persistido en DynamoDB y protegido con autorización por propietario.
-- Alta y baja de favoritos sin recargar la página, prevención de duplicados y colección con filtro local.
-- Navegación responsive, estados de carga, vacío y error, y logs estructurados en Lambda.
-- 18 pruebas unitarias distribuidas en 6 archivos.
+- Búsqueda por texto, orden y duración, con datos de duración, vistas y transmisiones en vivo.
+- Reproductor con dominio de privacidad mejorada.
+- Modelo `Favorite` en DynamoDB con autorización por propietario y prevención de duplicados.
+- Alta y baja de favoritos sin recargar, colección privada y filtro local.
 
-El código del Día 2 está completo y validado localmente. Su publicación requiere configurar `YOUTUBE_API_KEY` como secreto tanto en el sandbox como en la rama de Amplify Hosting.
+### Día 3: endurecimiento y operación
+
+- Scroll infinito con tokens nativos de YouTube, deduplicación y protección contra ciclos.
+- Skeletons para sesión de Cognito, carga inicial de videos, favoritos y páginas incrementales.
+- reCAPTCHA v2 con validación obligatoria dentro de Cognito, no sólo en el navegador.
+- Logs de AppSync y Lambdas sin tokens, búsquedas, credenciales ni datos personales.
+- Dashboard y alarmas para errores, throttling y latencia p95 de la búsqueda.
+- Pruebas de aceptación para autenticación, scroll, favoritos, tema, móvil y registro protegido.
+- Documentación final de arquitectura, seguridad, despliegue y decisiones.
 
 ## Arquitectura
 
@@ -38,9 +63,16 @@ flowchart LR
     N --> C[Amazon Cognito]
     N --> A[AWS AppSync]
     A --> D[(DynamoDB)]
-    A --> L[AWS Lambda]
+    A --> L[AWS Lambda: búsqueda]
     L --> Y[YouTube Data API v3]
-    S[Amplify Secrets / SSM] -. inyección segura .-> L
+    C --> P[AWS Lambda: preSignUp]
+    P --> G[Google reCAPTCHA siteverify]
+    S[Amplify Secrets / SSM] -. secretos .-> L
+    S -. secreto .-> P
+    A --> W[CloudWatch Logs]
+    L --> W
+    P --> W
+    W --> M[Dashboard y alarmas]
 
     C -->|JWT| N
     N -->|JWT| A
@@ -49,94 +81,89 @@ flowchart LR
 
 Flujo de búsqueda:
 
-1. El usuario autenticado envía términos y filtros desde Next.js.
-2. AppSync valida el JWT de Cognito y resuelve `searchVideos` mediante Lambda.
-3. Lambda valida la entrada y consulta `search.list` de YouTube.
-4. Una segunda consulta a `videos.list` completa duración y vistas en un solo lote.
-5. El frontend recibe datos normalizados y tokens opacos para avanzar o retroceder.
+1. AppSync valida el JWT y resuelve `searchVideos` mediante Lambda.
+2. Lambda valida la entrada y consulta `search.list` de YouTube.
+3. Una consulta a `videos.list` completa duración y vistas en un solo lote.
+4. El frontend conserva resultados, deduplica IDs y solicita el siguiente token cerca del final del scroll.
+
+Flujo de registro:
+
+1. El navegador obtiene un token de reCAPTCHA y lo envía como `clientMetadata` a Cognito.
+2. Cognito invoca `preSignUp`; la Lambda verifica el token directamente con Google.
+3. Se comprueba `success` y una lista explícita de hostnames permitidos.
+4. Ante ausencia, expiración, timeout o rechazo, el registro falla cerrado.
 
 Flujo de favoritos:
 
-1. Amplify Data envía las mutaciones autenticadas a AppSync.
-2. La regla `allow.owner()` limita lectura, creación y eliminación al propietario.
-3. El identificador `<cognito-sub>:<youtube-video-id>` evita duplicados por usuario.
-4. DynamoDB persiste metadatos suficientes para mostrar la colección sin consumir cuota de YouTube.
+1. Amplify Data envía operaciones autenticadas a AppSync.
+2. `allow.owner()` limita lectura, creación y eliminación al propietario del registro.
+3. El ID `<cognito-sub>:<youtube-video-id>` hace idempotente el alta por usuario y video.
 
 ## Decisiones técnicas
 
 ### Next.js y Amplify Gen 2
 
-El ejercicio tiene una ventana de 72 horas. La arquitectura serverless concentra el trabajo en la experiencia, seguridad y calidad sin operar contenedores, balanceadores o servidores permanentes. Next.js 15 está fijado explícitamente porque es una versión compatible con Amplify Hosting; Node.js 22 es la versión objetivo de desarrollo y CI.
+El reto permite elegir tecnología y sólo recomienda Angular y Node.js. Next.js y Amplify Gen 2 aprovechan la experiencia existente, reducen riesgo dentro de 72 horas y eliminan la operación de ECS, balanceadores e imágenes. El backend sigue siendo Node.js administrado en Lambdas, con infraestructura tipada y reproducible.
 
-### Integración con YouTube
+No se agregaron contenedores porque son un plus y no aportan una ventaja para estas cargas event-driven. ECS tendría más costo, configuración y superficie operativa sin mejorar los requisitos evaluados.
 
-La API no se consume directamente desde el navegador. Una consulta GraphQL autenticada invoca Lambda, que obtiene la clave mediante `secret("YOUTUBE_API_KEY")`. Esto evita exponerla en bundles, peticiones del cliente o variables públicas.
+### Biblioteca y experiencia UI
 
-Se conservan los tokens de página de YouTube en lugar de inventar paginación por número. La entrada se limita a 2-120 caracteres, los filtros usan enums y los tokens tienen validación de formato. Cada página solicita 12 resultados para mantener una cuadrícula útil sin agotar cuota innecesariamente.
+El proyecto ya usa `@aws-amplify/ui-react`; sus loaders se integran con skeletons propios que respetan el diseño. Lucide aporta iconos accesibles. Agregar Tailwind sólo para declarar otra biblioteca duplicaría el sistema de estilos y aumentaría el cambio sin valor funcional.
 
-### Persistencia y autorización
-
-`Favorite` usa autorización por propietario de Amplify Data. El cliente no puede consultar favoritos ajenos aunque modifique manualmente una operación GraphQL. Los IDs deterministas eliminan duplicados sin una consulta previa vulnerable a condiciones de carrera.
+La paginación visible se sustituyó por `IntersectionObserver`. Se solicitan 12 elementos por llamada, se conserva el contenido existente durante la siguiente carga y se muestra un skeleton incremental. Un fallo mantiene los resultados y ofrece reintento, en lugar de vaciar toda la pantalla.
 
 ### Seguridad y privacidad
 
-- Cognito administra contraseñas, verificación y tokens; la aplicación no almacena contraseñas.
-- La API key reside en Amplify Secrets, respaldado por SSM Parameter Store.
-- La búsqueda exige un JWT válido y el modelo aplica aislamiento por propietario.
-- Los errores externos se traducen a mensajes controlados sin filtrar respuestas de YouTube.
-- Los logs no incluyen términos de búsqueda, tokens de página, credenciales ni datos personales.
-- El reproductor usa `youtube-nocookie.com` y no se carga hasta que el usuario lo abre.
-- `amplify_outputs.json`, archivos de entorno, builds y logs están excluidos de Git.
+- Cognito administra hashes de contraseña, verificación, expiración y renovación de tokens.
+- AppSync exige JWT y DynamoDB queda detrás de autorización por propietario.
+- `YOUTUBE_API_KEY` y `GOOGLE_RECAPTCHA_SECRET_KEY` se resuelven desde Amplify Secrets.
+- La clave pública de reCAPTCHA es la única variable `NEXT_PUBLIC_*`; el secreto nunca se compila en Next.js.
+- El trigger `preSignUp` impide omitir CAPTCHA llamando Cognito directamente.
+- Los errores externos se traducen a mensajes controlados.
+- AppSync excluye contenido verbose y registra sólo errores durante un mes.
+- Los logs estructurados omiten PII, términos de búsqueda, tokens de página y respuestas CAPTCHA.
+- El identity pool no permite identidades anónimas.
+- El reproductor usa `youtube-nocookie.com` y se crea sólo cuando el usuario lo abre.
 
 ## Estructura
 
 ```text
 amplify/
+  auth/pre-sign-up/                 Trigger y verificación reCAPTCHA
   auth/resource.ts                  Cognito
-  data/resource.ts                  AppSync, DynamoDB y contrato GraphQL
-  data/search-videos/handler.ts     Handler y observabilidad
-  data/search-videos/youtube.ts     Cliente y normalización de YouTube
-  backend.ts                        Composición del backend
+  data/search-videos/               Lambda y cliente de YouTube
+  data/resource.ts                  AppSync, logging, DynamoDB y GraphQL
+  backend.ts                        Backend, dashboard y alarmas
 src/
-  app/videos/                       Búsqueda, filtros y paginación
+  app/videos/                       Búsqueda y scroll infinito
   app/favoritos/                    Colección privada
-  components/video/                 Tarjeta y reproductor compartidos
-  hooks/use-favorites.ts            Estado de favoritos
-  services/favorites.ts             Acceso tipado a Amplify Data
-  lib/                              Clientes, errores y validación
-.github/workflows/ci.yml            Pipeline de calidad
-amplify.yml                         Despliegue fullstack
+  components/auth/                  Flujos y widget reCAPTCHA
+  components/video/                 Tarjetas, reproductor y skeletons
+  hooks/ y services/                Estado y acceso tipado a Amplify
+tests/e2e/                          Aceptación con Playwright
+.github/workflows/                  CI y aceptación manual
 ```
 
 ## Desarrollo local
 
-Requisitos:
-
-- Node.js 22
-- npm 10 o superior
-- AWS CLI con un perfil autorizado para Amplify Gen 2
-- Una API key con YouTube Data API v3 habilitada
-
-Instala dependencias y registra el secreto del sandbox:
+Requisitos: Node.js 22, npm 10 o superior, AWS CLI, un perfil autorizado y claves para YouTube Data API v3 y reCAPTCHA v2 Checkbox.
 
 ```bash
 npm ci
 npx ampx sandbox secret set YOUTUBE_API_KEY --profile ismadev
+npx ampx sandbox secret set GOOGLE_RECAPTCHA_SECRET_KEY --profile ismadev
+cp .env.example .env.local
 ```
 
-Despliega el backend y genera `amplify_outputs.json`:
+Asigna la clave pública de reCAPTCHA a `NEXT_PUBLIC_RECAPTCHA_SITE_KEY` en `.env.local`. Después despliega el backend e inicia Next.js:
 
 ```bash
 npx ampx sandbox --once --profile ismadev
-```
-
-Inicia Next.js:
-
-```bash
 npm run dev
 ```
 
-La aplicación estará disponible en `http://localhost:3000`.
+Google proporciona un par público de prueba para localhost. Debe usarse únicamente en sandbox; producción necesita claves v2 reales registradas para `main.d1gqu7q6u0ec4d.amplifyapp.com`.
 
 ## Calidad
 
@@ -147,24 +174,27 @@ npm test
 npm run build
 ```
 
-`npm run check` ejecuta tipos, pruebas y build en secuencia. GitHub Actions ejecuta además lint para cada push y pull request contra `main`.
+`npm run check` ejecuta tipos, pruebas y build. Las pruebas unitarias cubren validación, YouTube, normalización, errores, favoritos, tarjetas, scroll y verificación CAPTCHA.
 
-Las pruebas cubren validación de entrada, construcción de consultas a YouTube, normalización de respuestas, errores de cuota y red, IDs de favoritos, transformación de datos e interacciones de las tarjetas.
+La aceptación autenticada se ejecuta con:
+
+```bash
+E2E_BASE_URL=http://localhost:3000 \
+E2E_USERNAME=usuario \
+E2E_PASSWORD=contraseña \
+npm run test:e2e
+```
+
+El workflow manual `Production acceptance` requiere los secrets de GitHub `E2E_USERNAME` y `E2E_PASSWORD`. No corre en cada push para evitar mutar favoritos de una cuenta de prueba durante CI ordinario.
 
 ## Despliegue
 
-El archivo [`amplify.yml`](./amplify.yml) instala dependencias de forma reproducible, ejecuta `ampx pipeline-deploy`, genera la configuración de la rama, compila Next.js y publica `.next`.
+`amplify.yml` instala dependencias, ejecuta `ampx pipeline-deploy`, compila Next.js y publica `.next`.
 
-Antes de publicar por primera vez el Día 2, agrega `YOUTUBE_API_KEY` en **Amplify Console > Hosting > Secrets** y asígnalo a la rama `main` o a todas las ramas. Los secretos de sandbox son independientes y no aparecen en Amplify Console.
+Antes de desplegar a producción configura en Amplify Hosting:
 
-Después, un push a `main` despliega backend y frontend de forma automática:
+1. Secret `YOUTUBE_API_KEY`.
+2. Secret `GOOGLE_RECAPTCHA_SECRET_KEY` con la clave privada real.
+3. Variable de entorno `NEXT_PUBLIC_RECAPTCHA_SITE_KEY` con la clave pública real.
 
-```bash
-git push origin main
-```
-
-## Plan de 72 horas
-
-- **Día 1, completo:** base del repositorio, autenticación integral, CI y primer despliegue.
-- **Día 2, código completo:** búsqueda segura de YouTube, AppSync/Lambda, favoritos privados, UI responsive, pruebas y documentación.
-- **Día 3:** reCAPTCHA validado server-side durante el registro, endurecimiento, pruebas de aceptación, monitoreo y documentación final.
+Los secretos del sandbox son independientes de los de Hosting. Una vez configurados, cada push a `main` despliega backend y frontend automáticamente.
