@@ -1,6 +1,7 @@
 "use client";
 
 import { fetchUserAttributes, getCurrentUser, signOut } from "aws-amplify/auth";
+import { Loader } from "@aws-amplify/ui-react";
 import {
   ChevronDown,
   Clapperboard,
@@ -17,6 +18,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { type FormEvent, useEffect, useRef, useState } from "react";
 import { Brand } from "@/components/brand";
 import { isAmplifyConfigured } from "@/components/providers/amplify-provider";
+import { VideoGridSkeleton } from "@/components/video/video-grid-skeleton";
 
 type HeaderSearch = {
   value: string;
@@ -120,7 +122,27 @@ export function AppShell({ children, search }: AppShellProps) {
   }
 
   if (loading) {
-    return <main className="page-loader dark" aria-live="polite"><span className="dark-spinner" />Cargando tu espacio...</main>;
+    return (
+      <div className="app-shell shell-skeleton" data-theme="dark" aria-busy="true" aria-live="polite">
+        <aside className="app-sidebar">
+          <div className="shell-skeleton-brand" />
+          <div className="shell-skeleton-nav active" />
+          <div className="shell-skeleton-nav" />
+        </aside>
+        <header className="app-header">
+          <div className="shell-skeleton-search" />
+          <Loader size="small" filledColor="var(--brand)" emptyColor="var(--app-line)" />
+        </header>
+        <div className="app-content">
+          <main className="app-main">
+            <div className="shell-skeleton-heading" />
+            <div className="shell-skeleton-subheading" />
+            <VideoGridSkeleton />
+          </main>
+        </div>
+        <span className="sr-only">Validando tu sesión con Cognito.</span>
+      </div>
+    );
   }
 
   return (

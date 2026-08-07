@@ -1,13 +1,15 @@
 "use client";
 
-import { AlertCircle, ChevronDown, Search, SlidersHorizontal, Sparkles } from "lucide-react";
+import { AlertCircle, ChevronDown, RefreshCw, Search, SlidersHorizontal, Sparkles } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { AppShell } from "@/components/layout/app-shell";
 import { VideoCard } from "@/components/video/video-card";
+import { VideoGridSkeleton } from "@/components/video/video-grid-skeleton";
 import { VideoPlayerDialog } from "@/components/video/video-player-dialog";
 import { useFavorites } from "@/hooks/use-favorites";
 import { dataClient } from "@/lib/data-client";
 import { getDataErrorMessage } from "@/lib/data-errors";
+import { mergeVideos } from "@/lib/video-results";
 import type { Video } from "@/types/video";
 
 type SearchOrder = "relevance" | "date" | "viewCount" | "rating";
@@ -16,7 +18,6 @@ type SearchParams = { query: string; order: SearchOrder; duration: VideoDuration
 type SearchPage = {
   items: Video[];
   nextPageToken?: string;
-  previousPageToken?: string;
   totalResults: number;
 };
 
@@ -40,16 +41,22 @@ export default function VideosPage() {
   const [activeSearch, setActiveSearch] = useState<SearchParams | null>(null);
   const [page, setPage] = useState<SearchPage | null>(null);
   const [selectedVideo, setSelectedVideo] = useState<Video | null>(null);
-  const [searching, setSearching] = useState(false);
+  const [loadingMode, setLoadingMode] = useState<"initial" | "more" | null>(null);
+  const [loadMoreBlocked, setLoadMoreBlocked] = useState(false);
   const [searchError, setSearchError] = useState("");
   const requestId = useRef(0);
   const initialSearchStarted = useRef(false);
+  const loadMoreSentinel = useRef<HTMLDivElement>(null);
   const favorites = useFavorites();
+  const searching = loadingMode !== null;
 
-  const executeSearch = useCallback(async (params: SearchParams, pageToken?: string) => {
+  const executeSearch = useCallback(async (params: SearchParams, pageToken?: string, append = false) => {
     const currentRequest = ++requestId.current;
-    setSearching(true);
+    setLoadingMode(append ? "more" : "initial");
     setSearchError("");
+    setLoadMoreBlocked(false);
+    if (!append) setPage(null);
+
     try {
       const response = await dataClient.queries.searchVideos(
         { ...params, pageToken },
@@ -57,25 +64,29 @@ export default function VideosPage() {
       );
       if (currentRequest !== requestId.current) return;
       if (response.errors?.length || !response.data) throw new Error(response.errors?.[0]?.message);
+      const data = response.data;
 
-      const items = (response.data.items ?? [])
+      const items = (data.items ?? [])
         .filter((item): item is NonNullable<typeof item> => Boolean(item))
         .map((item) => ({
           ...item,
           duration: item.duration ?? undefined,
           viewCount: item.viewCount ?? undefined,
         }));
-      setPage({
-        items,
-        nextPageToken: response.data.nextPageToken ?? undefined,
-        previousPageToken: response.data.previousPageToken ?? undefined,
-        totalResults: response.data.totalResults,
-      });
+
+      setPage((current) => ({
+        items: append && current ? mergeVideos(current.items, items) : items,
+        nextPageToken: data.nextPageToken === pageToken ? undefined : data.nextPageToken ?? undefined,
+        totalResults: data.totalResults,
+      }));
       setActiveSearch(params);
     } catch (error) {
-      if (currentRequest === requestId.current) setSearchError(getDataErrorMessage(error));
+      if (currentRequest === requestId.current) {
+        setSearchError(getDataErrorMessage(error));
+        setLoadMoreBlocked(append);
+      }
     } finally {
-      if (currentRequest === requestId.current) setSearching(false);
+      if (currentRequest === requestId.current) setLoadingMode(null);
     }
   }, []);
 
@@ -102,12 +113,24 @@ export default function VideosPage() {
     void executeSearch({ query: categoryQuery, order, duration });
   }
 
-  function changePage(pageToken?: string) {
-    if (!activeSearch || !pageToken) return;
-    void executeSearch(activeSearch, pageToken).then(() => {
-      window.scrollTo({ top: 0, behavior: "smooth" });
-    });
-  }
+  const loadMore = useCallback(() => {
+    if (!activeSearch || !page?.nextPageToken || searching || loadMoreBlocked) return;
+    void executeSearch(activeSearch, page.nextPageToken, true);
+  }, [activeSearch, executeSearch, loadMoreBlocked, page?.nextPageToken, searching]);
+
+  useEffect(() => {
+    const target = loadMoreSentinel.current;
+    if (!target || !page?.nextPageToken || loadMoreBlocked) return;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry?.isIntersecting) loadMore();
+      },
+      { rootMargin: "600px 0px" },
+    );
+    observer.observe(target);
+    return () => observer.disconnect();
+  }, [loadMore, loadMoreBlocked, page?.nextPageToken]);
 
   return (
     <AppShell
@@ -156,7 +179,7 @@ export default function VideosPage() {
             </button>
           </div>
 
-          {filtersOpen && (
+          {filtersOpen ? (
             <div className="filter-panel">
               <SlidersHorizontal size={19} aria-hidden="true" />
               <label className="filter-field">
@@ -179,17 +202,15 @@ export default function VideosPage() {
               </label>
               <button type="button" className="apply-filters" onClick={submitSearch} disabled={searching}>Aplicar</button>
             </div>
-          )}
+          ) : null}
         </div>
 
-        {(searchError || favorites.error) && (
+        {(searchError || favorites.error) && !loadMoreBlocked ? (
           <div className="page-alert" role="alert"><AlertCircle size={19} aria-hidden="true" />{searchError || favorites.error}</div>
-        )}
+        ) : null}
 
-        {searching && !page ? (
-          <div className="video-grid" aria-label="Cargando resultados">
-            {Array.from({ length: 6 }, (_, index) => <div className="video-skeleton" key={index} />)}
-          </div>
+        {loadingMode === "initial" ? (
+          <VideoGridSkeleton label="Buscando videos en YouTube" />
         ) : page ? (
           <section className="results-section" aria-live="polite" aria-busy={searching}>
             <div className="results-meta">
@@ -197,7 +218,7 @@ export default function VideosPage() {
               <span>{new Intl.NumberFormat("es-MX").format(page.totalResults)} resultados</span>
             </div>
             {page.items.length ? (
-              <div className={searching ? "video-grid loading" : "video-grid"}>
+              <div className="video-grid">
                 {page.items.map((video) => (
                   <VideoCard
                     key={video.videoId}
@@ -209,13 +230,20 @@ export default function VideosPage() {
                   />
                 ))}
               </div>
-            ) : <div className="empty-state"><Search size={30} aria-hidden="true" /><h2>Sin resultados</h2><p>Prueba con otros términos o cambia los filtros.</p></div>}
-            {(page.previousPageToken || page.nextPageToken) && (
-              <nav className="pagination" aria-label="Páginas de resultados">
-                <button type="button" disabled={!page.previousPageToken || searching} onClick={() => changePage(page.previousPageToken)}>Anterior</button>
-                <button type="button" disabled={!page.nextPageToken || searching} onClick={() => changePage(page.nextPageToken)}>Siguiente</button>
-              </nav>
+            ) : (
+              <div className="empty-state"><Search size={30} aria-hidden="true" /><h2>Sin resultados</h2><p>Prueba con otros términos o cambia los filtros.</p></div>
             )}
+            {loadingMode === "more" ? <VideoGridSkeleton count={3} label="Cargando más videos" incremental /> : null}
+            {loadMoreBlocked && page.nextPageToken ? (
+              <div className="load-more-retry" role="alert">
+                <p>{searchError || "No fue posible cargar el siguiente bloque."}</p>
+                <button type="button" onClick={() => { setLoadMoreBlocked(false); setSearchError(""); }}>
+                  <RefreshCw size={17} aria-hidden="true" />Reintentar
+                </button>
+              </div>
+            ) : null}
+            {page.nextPageToken && !loadMoreBlocked ? <div ref={loadMoreSentinel} className="scroll-sentinel" aria-hidden="true" /> : null}
+            {!page.nextPageToken && page.items.length ? <p className="results-end">Llegaste al final de los resultados.</p> : null}
           </section>
         ) : (
           <div className="empty-state initial"><Search size={34} aria-hidden="true" /><h2>Encuentra tu próximo video</h2><p>Escribe un tema para comenzar.</p></div>

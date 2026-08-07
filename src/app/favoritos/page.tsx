@@ -4,6 +4,7 @@ import { AlertCircle, Heart, Search } from "lucide-react";
 import { useMemo, useState } from "react";
 import { AppShell } from "@/components/layout/app-shell";
 import { VideoCard } from "@/components/video/video-card";
+import { VideoGridSkeleton } from "@/components/video/video-grid-skeleton";
 import { VideoPlayerDialog } from "@/components/video/video-player-dialog";
 import { useFavorites } from "@/hooks/use-favorites";
 import { favoriteToVideo, type Video } from "@/types/video";
@@ -40,9 +41,7 @@ export default function FavoritesPage() {
         {favorites.error && <div className="page-alert" role="alert"><AlertCircle size={19} aria-hidden="true" />{favorites.error}</div>}
 
         {favorites.loading ? (
-          <div className="video-grid" aria-label="Cargando favoritos">
-            {Array.from({ length: 6 }, (_, index) => <div className="video-skeleton" key={index} />)}
-          </div>
+          <VideoGridSkeleton label="Cargando favoritos" />
         ) : videos.length ? (
           <div className="video-grid">
             {videos.map((video) => (
