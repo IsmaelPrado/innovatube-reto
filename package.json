@@ -14,6 +14,7 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
+    "smoke:cloud": "node scripts/smoke-cloud.mjs",
     "sandbox": "ampx sandbox",
     "sandbox:delete": "ampx sandbox delete",
     "check": "npm run typecheck && npm run test && npm run build"
