@@ -1,0 +1,32 @@
+# dependencies
+/node_modules
+
+# Next.js
+/.next
+/out
+
+# Amplify
+/.amplify
+/amplify_outputs.json
+
+# test and tooling output
+/coverage
+/playwright-report
+/test-results
+*.tsbuildinfo
+
+# local configuration
+.env
+.env.*
+!.env.example
+
+# operating system and editors
+.DS_Store
+Thumbs.db
+.idea
+.vscode/*
+!.vscode/extensions.json
+
+# logs
+*.log
+
