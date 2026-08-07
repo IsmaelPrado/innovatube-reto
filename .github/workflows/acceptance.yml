@@ -1,0 +1,43 @@
+name: Production acceptance
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-acceptance
+  cancel-in-progress: false
+
+jobs:
+  acceptance:
+    name: Browser acceptance
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      E2E_BASE_URL: https://main.d1gqu7q6u0ec4d.amplifyapp.com
+      E2E_USERNAME: ${{ secrets.E2E_USERNAME }}
+      E2E_PASSWORD: ${{ secrets.E2E_PASSWORD }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Validate acceptance credentials
+        run: test -n "$E2E_USERNAME" && test -n "$E2E_PASSWORD"
+
+      - name: Run production acceptance
+        run: npm run test:e2e
