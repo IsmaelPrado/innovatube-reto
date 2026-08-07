@@ -4,12 +4,15 @@
 
 Aplicación web para descubrir videos de YouTube y administrar una colección personal de favoritos.
 
+**Aplicación desplegada:** [main.d1gqu7q6u0ec4d.amplifyapp.com](https://main.d1gqu7q6u0ec4d.amplifyapp.com/login)
+
 ## Estado
 
 Entrega del Día 1:
 
 - Next.js 15, React 19 y TypeScript configurados.
 - Backend Amplify Gen 2 desplegado en un sandbox de `us-east-1`.
+- Rama `main` desplegada en Amplify Hosting con CI/CD automático.
 - Cognito configurado con registro público, verificación por correo y recuperación de contraseña.
 - Inicio de sesión mediante username o email verificado.
 - Registro, confirmación, reenvío de código, login, logout y recuperación en dos pasos.
