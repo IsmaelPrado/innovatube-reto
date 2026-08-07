@@ -20,7 +20,14 @@ export default function FavoritesPage() {
   }, [favorites.favorites, filter]);
 
   return (
-    <AppShell>
+    <AppShell
+      search={{
+        value: filter,
+        placeholder: "Buscar en tus favoritos...",
+        onChange: setFilter,
+        onSubmit: () => undefined,
+      }}
+    >
       <main className="app-main">
         <section className="page-heading favorites-heading">
           <div>
@@ -29,14 +36,6 @@ export default function FavoritesPage() {
           </div>
           <span className="collection-count"><Heart size={17} fill="currentColor" aria-hidden="true" />{favorites.favorites.length}</span>
         </section>
-
-        {favorites.favorites.length > 0 && (
-          <label className="collection-filter">
-            <Search size={19} aria-hidden="true" />
-            <span className="sr-only">Filtrar favoritos</span>
-            <input value={filter} onChange={(event) => setFilter(event.target.value)} placeholder="Filtrar por título o canal" />
-          </label>
-        )}
 
         {favorites.error && <div className="page-alert" role="alert"><AlertCircle size={19} aria-hidden="true" />{favorites.error}</div>}
 

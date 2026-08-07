@@ -1,6 +1,6 @@
 "use client";
 
-import { ExternalLink, Heart, Play } from "lucide-react";
+import { Heart, Play } from "lucide-react";
 import Image from "next/image";
 import type { Video } from "@/types/video";
 
@@ -53,9 +53,6 @@ export function VideoCard({ video, favorite, pending, onToggleFavorite, onPlay }
         </div>
         <p className="video-channel">{video.channelTitle}</p>
         <p className="video-metadata">{[views, published].filter(Boolean).join(" · ")}</p>
-        <a className="youtube-link" href={`https://www.youtube.com/watch?v=${video.videoId}`} target="_blank" rel="noreferrer">
-          Abrir en YouTube <ExternalLink size={14} aria-hidden="true" />
-        </a>
       </div>
     </article>
   );
