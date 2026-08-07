@@ -50,9 +50,9 @@ const schema = a.schema({
       duration: a.string(),
       viewCount: a.string(),
       isLive: a.boolean().required(),
-      owner: a.string().authorization((allow) => [allow.owner().to(["read", "delete"])]),
+      owner: a.string(),
     })
-    .authorization((allow) => [allow.owner()]),
+    .authorization((allow) => [allow.owner().to(["create", "read", "delete"])]),
 
   searchVideos: a
     .query()
@@ -75,4 +75,3 @@ export const data = defineData({
     defaultAuthorizationMode: "userPool",
   },
 });
-
