@@ -18,6 +18,10 @@
     "sandbox:delete": "ampx sandbox delete",
     "check": "npm run typecheck && npm run test && npm run build"
   },
+  "overrides": {
+    "postcss": "8.5.26",
+    "sharp": "0.35.3"
+  },
   "dependencies": {
     "@aws-amplify/ui-react": "6.15.5",
     "aws-amplify": "6.20.0",
