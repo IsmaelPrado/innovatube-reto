@@ -168,11 +168,6 @@ select:focus-visible {
   gap: 18px;
 }
 
-.captcha-field,
-.captcha-widget {
-  min-height: 78px;
-}
-
 .captcha-error {
   margin: 8px 0 0;
   color: #a82032;
@@ -1457,17 +1452,6 @@ select:focus-visible {
     width: 100%;
   }
 
-  .captcha-field {
-    max-width: 100%;
-    overflow: hidden;
-  }
-
-  .captcha-widget {
-    width: 304px;
-    max-width: 100%;
-    transform-origin: left top;
-  }
-
   .app-header {
     height: auto;
     min-height: 72px;
@@ -1560,19 +1544,6 @@ select:focus-visible {
 
   .player-dialog-header {
     padding: 11px;
-  }
-}
-
-@media (max-width: 340px) {
-  .captcha-field,
-  .captcha-widget {
-    min-height: 69px;
-  }
-
-  .captcha-widget {
-    width: 304px;
-    max-width: none;
-    transform: scale(0.88);
   }
 }
 

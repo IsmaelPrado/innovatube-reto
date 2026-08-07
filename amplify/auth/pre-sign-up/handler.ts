@@ -15,12 +15,16 @@ export const handler: PreSignUpTriggerHandler = async (event) => {
       token: event.request.clientMetadata?.recaptchaToken ?? "",
       secret: process.env.GOOGLE_RECAPTCHA_SECRET_KEY ?? "",
       allowedHostnames: (process.env.RECAPTCHA_ALLOWED_HOSTNAMES ?? "").split(",").map((hostname) => hostname.trim()),
+      expectedAction: "signup",
+      minimumScore: Number(process.env.RECAPTCHA_MINIMUM_SCORE ?? "0.5"),
     });
 
     console.info(JSON.stringify({
       event: "auth.signup.captcha",
       valid: result.valid,
       hostname: result.hostname,
+      action: result.action,
+      score: result.score,
       reason: result.reason,
       durationMs: Math.round(performance.now() - startedAt),
     }));

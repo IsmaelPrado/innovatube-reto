@@ -8,7 +8,7 @@ import { useState } from "react";
 import { AuthAlert } from "@/components/auth/auth-alert";
 import { AuthShell } from "@/components/auth/auth-shell";
 import { SubmitButton, TextField } from "@/components/auth/form-controls";
-import { RecaptchaField } from "@/components/auth/recaptcha-field";
+import { executeSignUpCaptcha, RecaptchaField } from "@/components/auth/recaptcha-field";
 import { isAmplifyConfigured } from "@/components/providers/amplify-provider";
 import { getAuthErrorMessage } from "@/lib/auth-errors";
 import { getFieldErrors, registrationSchema, type FieldErrors } from "@/lib/auth-validation";
@@ -18,8 +18,6 @@ export default function RegistrationPage() {
   const [errors, setErrors] = useState<FieldErrors>({});
   const [formError, setFormError] = useState("");
   const [loading, setLoading] = useState(false);
-  const [captchaToken, setCaptchaToken] = useState("");
-  const [captchaResetKey, setCaptchaResetKey] = useState(0);
 
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -41,10 +39,6 @@ export default function RegistrationPage() {
     }
 
     setErrors({});
-    if (!captchaToken) {
-      setFormError("Confirma que no eres un robot para continuar.");
-      return;
-    }
     if (!isAmplifyConfigured) {
       setFormError("El backend local aún no está conectado. Ejecuta npm run sandbox para generar la configuración.");
       return;
@@ -52,6 +46,7 @@ export default function RegistrationPage() {
 
     setLoading(true);
     try {
+      const captchaToken = await executeSignUpCaptcha();
       const { givenName, familyName, username, email, password } = result.data;
       const { nextStep } = await signUp({
         username,
@@ -77,7 +72,6 @@ export default function RegistrationPage() {
       router.push(`/confirmar?username=${encodeURIComponent(username)}&email=${encodeURIComponent(email)}`);
     } catch (error) {
       setFormError(getAuthErrorMessage(error));
-      setCaptchaResetKey((current) => current + 1);
     } finally {
       setLoading(false);
     }
@@ -109,7 +103,7 @@ export default function RegistrationPage() {
           <TextField name="confirmPassword" label="Confirmar contraseña" icon={KeyRound} placeholder="Repite tu contraseña" type="password" autoComplete="new-password" error={errors.confirmPassword} required />
         </div>
         <p className="helper-text">Usa mayúsculas, minúsculas, un número y un símbolo.</p>
-        <RecaptchaField onChange={setCaptchaToken} resetKey={captchaResetKey} />
+        <RecaptchaField />
         <SubmitButton loading={loading} loadingLabel="Creando cuenta...">Crear cuenta</SubmitButton>
       </form>
     </AuthShell>

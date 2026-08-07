@@ -11,7 +11,7 @@ Aplicación web fullstack para descubrir videos de YouTube y administrar una col
 | Requisito | Implementación | Estado |
 | --- | --- | --- |
 | Registro público | Nombre, apellido, username, email, contraseña y confirmación | Completo |
-| reCAPTCHA | Widget v2 y validación server-side en un trigger `preSignUp` de Cognito | Completo |
+| reCAPTCHA | v3 por score y validación server-side en un trigger `preSignUp` de Cognito | Completo |
 | Inicio de sesión | Username o email verificado, contraseña y logout | Completo |
 | Recuperación | Solicitud y confirmación de nueva contraseña mediante Cognito | Completo |
 | Videos | Búsqueda, orden, duración, reproducción y carga incremental | Completo |
@@ -48,7 +48,7 @@ Los logs operativos no se muestran en la UI porque pueden revelar detalles inter
 
 - Scroll infinito con tokens nativos de YouTube, deduplicación y protección contra ciclos.
 - Skeletons para sesión de Cognito, carga inicial de videos, favoritos y páginas incrementales.
-- reCAPTCHA v2 con validación obligatoria dentro de Cognito, no sólo en el navegador.
+- reCAPTCHA v3 ejecutado al enviar y validado obligatoriamente dentro de Cognito.
 - Logs de AppSync y Lambdas sin tokens, búsquedas, credenciales ni datos personales.
 - Dashboard y alarmas para errores, throttling y latencia p95 de la búsqueda.
 - Pruebas de aceptación para autenticación, scroll, favoritos, tema, móvil y registro protegido.
@@ -88,9 +88,9 @@ Flujo de búsqueda:
 
 Flujo de registro:
 
-1. El navegador obtiene un token de reCAPTCHA y lo envía como `clientMetadata` a Cognito.
+1. Al enviar el formulario, el navegador ejecuta la acción v3 `signup` y envía el token como `clientMetadata` a Cognito.
 2. Cognito invoca `preSignUp`; la Lambda verifica el token directamente con Google.
-3. Se comprueba `success` y una lista explícita de hostnames permitidos.
+3. Se comprueban `success`, hostname, `action=signup` y un score mínimo de `0.5`.
 4. Ante ausencia, expiración, timeout o rechazo, el registro falla cerrado.
 
 Flujo de favoritos:
@@ -138,7 +138,7 @@ amplify/
 src/
   app/videos/                       Búsqueda y scroll infinito
   app/favoritos/                    Colección privada
-  components/auth/                  Flujos y widget reCAPTCHA
+  components/auth/                  Flujos e integración reCAPTCHA v3
   components/video/                 Tarjetas, reproductor y skeletons
   hooks/ y services/                Estado y acceso tipado a Amplify
 tests/e2e/                          Aceptación con Playwright
@@ -147,7 +147,7 @@ tests/e2e/                          Aceptación con Playwright
 
 ## Desarrollo local
 
-Requisitos: Node.js 22, npm 10 o superior, AWS CLI, un perfil autorizado y claves para YouTube Data API v3 y reCAPTCHA v2 Checkbox.
+Requisitos: Node.js 22, npm 10 o superior, AWS CLI, un perfil autorizado y claves para YouTube Data API v3 y reCAPTCHA v3.
 
 ```bash
 npm ci
@@ -163,7 +163,7 @@ npx ampx sandbox --once --profile ismadev
 npm run dev
 ```
 
-Google proporciona un par público de prueba para localhost. Debe usarse únicamente en sandbox; producción necesita claves v2 reales registradas para `main.d1gqu7q6u0ec4d.amplifyapp.com`.
+Google recomienda crear una clave v3 separada para desarrollo y permitir sólo `localhost` en ella. Producción usa claves v3 registradas para `main.d1gqu7q6u0ec4d.amplifyapp.com`.
 
 ## Calidad
 

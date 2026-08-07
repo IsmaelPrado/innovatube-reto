@@ -1,5 +1,7 @@
 type RecaptchaResponse = {
   success?: boolean;
+  score?: number;
+  action?: string;
   hostname?: string;
   "error-codes"?: string[];
 };
@@ -8,11 +10,15 @@ type VerifyRecaptchaInput = {
   token: string;
   secret: string;
   allowedHostnames: string[];
+  expectedAction?: string;
+  minimumScore?: number;
   fetcher?: typeof fetch;
 };
 
 export type RecaptchaVerification = {
   valid: boolean;
+  score?: number;
+  action?: string;
   hostname?: string;
   reason?: string;
 };
@@ -21,6 +27,8 @@ export async function verifyRecaptchaToken({
   token,
   secret,
   allowedHostnames,
+  expectedAction = "signup",
+  minimumScore = 0.5,
   fetcher = fetch,
 }: VerifyRecaptchaInput): Promise<RecaptchaVerification> {
   if (!token || !secret) return { valid: false, reason: "missing-input" };
@@ -39,6 +47,12 @@ export async function verifyRecaptchaToken({
   if (!result.hostname || !allowedHostnames.includes(result.hostname)) {
     return { valid: false, hostname: result.hostname, reason: "hostname-mismatch" };
   }
+  if (result.action !== expectedAction) {
+    return { valid: false, hostname: result.hostname, action: result.action, score: result.score, reason: "action-mismatch" };
+  }
+  if (typeof result.score !== "number" || result.score < minimumScore) {
+    return { valid: false, hostname: result.hostname, action: result.action, score: result.score, reason: "low-score" };
+  }
 
-  return { valid: true, hostname: result.hostname };
+  return { valid: true, hostname: result.hostname, action: result.action, score: result.score };
 }
